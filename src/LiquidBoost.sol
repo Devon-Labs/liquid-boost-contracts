@@ -2,11 +2,11 @@
 pragma solidity >=0.8.0;
 pragma abicoder v2;
 
-import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
-import "@uniswap/v3-core/contracts/libraries/TickMath.sol";
-import "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
-import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "lib/openzeppelin-contracts/contracts/token/ERC721/IERC721Receiver.sol";
+import "lib/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
+import "lib/v3-core/contracts/libraries/TickMath.sol";
+import "lib/v3-periphery/contracts/libraries/TransferHelper.sol";
+import "lib/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 
 contract LiquidBoost is IERC721Receiver {
     struct Position {
