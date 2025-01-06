@@ -3,11 +3,15 @@ pragma solidity >=0.8.0;
 
 import "lib/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "lib/v3-periphery/contracts/libraries/TransferHelper.sol";
+import "./interfaces/IUniversalRouter.sol";
+import {Commands} from "./libraries/Commands.sol";
+import {Constants} from "./libraries/Constants.sol";
 
 contract Deposit {
     mapping(address => uint256) public balances;
 
     event UserDeposit(address indexed user, uint256 amount);
+    event UserWithdraw(address indexed user, uint256 amount);
 
     ISwapRouter public immutable swapRouter;
     IUniversalRouter public immutable universalRouter;
@@ -17,14 +21,32 @@ contract Deposit {
         universalRouter = _universalRouter;
     }
 
-    function deposit() public payable {
+    function depositETH() external payable {
         require(msg.value > 0, "Deposit amount must be greater than 0");
         balances[msg.sender] += msg.value;
+        this.wrapETH(msg.sender, msg.value);
+
         emit UserDeposit(msg.sender, msg.value);
     }
 
-    function getBalance() public view returns (uint256) {
-        return balances[msg.sender];
+    function depositWETH(uint256 amount) external {
+        require(amount > 0, "Deposit amount must be greater than 0");
+        TransferHelper.safeTransferFrom(Constants.WETH9, msg.sender, address(this), amount);
+        balances[msg.sender] += amount;
+
+        emit UserDeposit(msg.sender, amount);
+    }
+
+    function withdrawWETH(uint256 amount) external {
+        require(balances[msg.sender] >= amount, "Not enough balance");
+        balances[msg.sender] -= amount;
+        TransferHelper.safeTransfer(Constants.WETH9, msg.sender, amount);
+
+        emit UserWithdraw(msg.sender, amount);
+    }
+
+    function getBalance(address owner) public view returns (uint256) {
+        return balances[owner];
     }
 
     function swapExactInputSingle(uint256 amountIn, address tokenIn, address tokenOut, uint24 poolFee) external returns (uint256 amountOut) {
@@ -50,8 +72,10 @@ contract Deposit {
     function wrapETH(address owner, uint256 amount) external {
         require(balances[owner] >= amount, "Not enough balance");
 
-        balances[owner] -= amount;
-
-        
+        bytes[] memory inputs = new bytes[](1);
+        inputs[0] = abi.encode(address(this), amount);
+        uint256 deadline = block.timestamp + 60;
+        bytes memory commands = abi.encodePacked(bytes1(uint8(Commands.WRAP_ETH)));
+        universalRouter.execute{value: amount}(commands, inputs, deadline);
     }
 }

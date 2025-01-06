@@ -6,13 +6,15 @@ import "@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.s
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "./Deposit.sol";
 import "./LiquidityProvision.sol";
+import "./interfaces/IUniversalRouter.sol";
 
 contract LiquidBoost is IERC721Receiver, Deposit, LiquidityProvision {
 
     constructor (
         INonfungiblePositionManager _nonfungiblePositionManager,
-        ISwapRouter _swapRouter
-    ) Deposit(_swapRouter) LiquidityProvision(_nonfungiblePositionManager) {}
+        ISwapRouter _swapRouter,
+        IUniversalRouter _universalRouter
+    ) Deposit(_swapRouter, _universalRouter) LiquidityProvision(_nonfungiblePositionManager) {}
     
     function onERC721Received(
         address operator,
