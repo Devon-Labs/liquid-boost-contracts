@@ -24,9 +24,14 @@ contract Deposit {
     function depositETH() external payable {
         require(msg.value > 0, "Deposit amount must be greater than 0");
         balances[msg.sender] += msg.value;
-        this.wrapETH(msg.sender, msg.value);
+        _wrapETH(address(this), msg.value);
 
         emit UserDeposit(msg.sender, msg.value);
+    }
+
+    function wrapETH(address to) external payable {
+        require(msg.value > 0, "Deposit amount must be greater than 0");
+        _wrapETH(to, msg.value);
     }
 
     function depositWETH(uint256 amount) external {
@@ -40,7 +45,7 @@ contract Deposit {
     function withdrawWETH(uint256 amount) external {
         require(balances[msg.sender] >= amount, "Not enough balance");
         balances[msg.sender] -= amount;
-        TransferHelper.safeTransfer(Constants.WETH9, msg.sender, amount);
+        TransferHelper.safeTransferFrom(Constants.WETH9, address(this), msg.sender, amount);
 
         emit UserWithdraw(msg.sender, amount);
     }
@@ -69,11 +74,9 @@ contract Deposit {
         amountOut = swapRouter.exactInputSingle(params);
     }
 
-    function wrapETH(address owner, uint256 amount) external {
-        require(balances[owner] >= amount, "Not enough balance");
-
+    function _wrapETH(address to, uint256 amount) internal {
         bytes[] memory inputs = new bytes[](1);
-        inputs[0] = abi.encode(address(this), amount);
+        inputs[0] = abi.encode(to, amount);
         uint256 deadline = block.timestamp + 60;
         bytes memory commands = abi.encodePacked(bytes1(uint8(Commands.WRAP_ETH)));
         universalRouter.execute{value: amount}(commands, inputs, deadline);

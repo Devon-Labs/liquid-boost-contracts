@@ -4,6 +4,7 @@ pragma solidity >=0.8.0;
 import "lib/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
 import "lib/v3-periphery/contracts/libraries/TransferHelper.sol";
 import "lib/v3-core/contracts/libraries/TickMath.sol";
+import {RiskProfile} from "./LiquidBoost.sol";
 
 contract LiquidityProvision {
     INonfungiblePositionManager public immutable nonfungiblePositionManager;
@@ -13,6 +14,9 @@ contract LiquidityProvision {
         uint128 liquidity;
         address token0;
         address token1;
+        uint24 poolFee;
+        int24 tickLower;
+        int24 tickUpper;
     }
 
     mapping(uint256 => Position) public positions;
@@ -22,17 +26,24 @@ contract LiquidityProvision {
     }
 
     function _createPosition(address owner, uint256 tokenId) internal {
-        (, , address token0, address token1, , , , uint128 liquidity, , , , ) = nonfungiblePositionManager.positions(tokenId);
+        (, , address token0, address token1, uint24 fee, int24 tickLower , int24 tickUpper, uint128 liquidity, , , , ) = nonfungiblePositionManager.positions(tokenId);
 
         positions[tokenId] = Position({
             owner: owner, 
             token0: token0,
             token1: token1,
-            liquidity: liquidity
+            liquidity: liquidity,
+            poolFee: fee,
+            tickLower: tickLower,
+            tickUpper: tickUpper
         });
     }
 
-    function mintNewPosition(address token0, uint256 amount0, address token1, uint256 amount1, uint24 poolFee) external returns (uint256 tokenId, uint128 liquidity) {
+    function getPosition(uint256 tokenId) external view returns (Position memory) {
+        return positions[tokenId];
+    }
+
+    function mintNewPosition(address token0, uint256 amount0, address token1, uint256 amount1, uint24 poolFee, RiskProfile memory risk) external returns (uint256 tokenId, uint128 liquidity) {
 
         TransferHelper.safeApprove(token0, address(nonfungiblePositionManager), amount0);
         TransferHelper.safeApprove(token1, address(nonfungiblePositionManager), amount1);
@@ -41,8 +52,8 @@ contract LiquidityProvision {
             token0: token0,
             token1: token1,
             fee: poolFee,
-            tickLower: TickMath.MIN_TICK,
-            tickUpper: TickMath.MAX_TICK,
+            tickLower: risk.tickLower,
+            tickUpper: risk.tickUpper,
             amount0Desired: amount0,
             amount1Desired: amount1,
             amount0Min: 0,
@@ -52,8 +63,6 @@ contract LiquidityProvision {
         });
 
         (tokenId, liquidity, amount0, amount1) = nonfungiblePositionManager.mint(params);
-
-        _createPosition(msg.sender, tokenId);
     }
 
     function collectAllFees(uint256 tokenId) external returns (uint256 amount0, uint256 amount1) {
