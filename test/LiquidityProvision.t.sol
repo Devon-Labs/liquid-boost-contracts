@@ -39,37 +39,61 @@ contract LiquidityProvision is Test {
             -887220,
             887220
         );
-        (uint256 tokenId, uint128 liquidity) = liquidBoost.mintNewPosition(Constants.WBTC, amountOut, Constants.WETH9, 0.5 ether, 3000, risk);
 
-        console.log("Token ID: ", tokenId);
-        console.log("Liquidity: ", liquidity);
+        vm.prank(alice);
+        (uint256 tokenId, uint128 liquidity) = liquidBoost.mintNewPosition(Constants.WBTC, amountOut, Constants.WETH9, 0.5 ether, 3000, risk);
 
         (
             uint96 nonce,
-            address operator,
+            ,
             address token0,
             address token1,
             uint24 fee,
             int24 tickLower,
             int24 tickUpper,
             ,
-            uint256 feeGrowthInside0LastX128,
-            uint256 feeGrowthInside1LastX128,
-            uint128 tokensOwed0,
-            uint128 tokensOwed1
+            ,
+            ,
+            ,
         ) = nonfungiblePositionManager.positions(tokenId);
 
-        console.log("Nonce: ", nonce);
-        console.log("Operator: ", operator);
-        console.log("Token0: ", token0);
-        console.log("Token1: ", token1);
-        console.log("Fee: ", fee);
-        console.log("Tick Lower: ", tickLower);
-        console.log("Tick Upper: ", tickUpper);
-        console.log("Fee Growth Inside 0 Last X128: ", feeGrowthInside0LastX128);
-        console.log("Fee Growth Inside 1 Last X128: ", feeGrowthInside1LastX128);
-        console.log("Tokens Owed 0: ", tokensOwed0);
-        console.log("Tokens Owed 1: ", tokensOwed1);
-        
+        address positionOwner = nonfungiblePositionManager.ownerOf(tokenId);
+
+        assertEq(positionOwner, address(liquidBoost), "Position owner should be the contract address");
+        assertGt(liquidity, 0, "Liquidity should be greater than 0");
+        assertEq(nonce, 0, "Nonce should be 0");
+        assertEq(token0, Constants.WBTC, "Token0 should be WBTC");
+        assertEq(token1, Constants.WETH9, "Token1 should be WETH");
+        assertEq(fee, 3000, "Fee should be 3000");
+        assertEq(tickLower, -887220, "Tick Lower should be -887220");
+        assertEq(tickUpper, 887220, "Tick Upper should be 887220");        
+    }
+
+    function testRemoveLiquidity() public {
+        vm.prank(alice);
+        liquidBoost.depositETH{value: 1 ether}();
+
+        vm.prank(alice);
+        uint256 amountOut = liquidBoost.swapExactInputSingle(0.5 ether, Constants.WETH9, Constants.WBTC, 3000);
+        RiskProfile memory risk = RiskProfile(
+            -887220,
+            887220
+        );
+
+        vm.prank(alice);
+        (uint256 tokenId, uint128 liquidity) = liquidBoost.mintNewPosition(Constants.WBTC, amountOut, Constants.WETH9, 0.5 ether, 3000, risk);
+
+        LiquidBoost.Position memory position = liquidBoost.getPosition(tokenId);
+
+        assertGt(position.liquidity, 0, "Liquidity should be greater than 0");
+        assertEq(position.liquidity, liquidity, "Liquidity should be equal to the minted liquidity");
+        assertEq(alice, position.owner, "Alice should be the owner of the position");
+
+        vm.prank(alice);
+        (uint256 amount0, uint256 amount1, , ) = liquidBoost.removeLiquidity(tokenId);
+
+        assertGt(amount0, 0, "Amount0 should be greater than 0");
+        assertGt(amount1, 0, "Amount1 should be greater than 0");
+
     }
 }

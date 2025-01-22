@@ -74,6 +74,27 @@ contract Deposit {
         amountOut = swapRouter.exactInputSingle(params);
     }
 
+    function swapExactOutputSingle(uint256 amountOut, address tokenIn, uint256 amountInMax, address tokenOut, uint24 poolFee) external returns (uint256 amountIn) {
+        require(amountOut > 0, "Not enough amount out");
+        require(balances[msg.sender] >= amountInMax, "Not enough balance");
+
+        TransferHelper.safeApprove(tokenIn, address(swapRouter), amountInMax);
+
+        ISwapRouter.ExactOutputSingleParams memory params = 
+            ISwapRouter.ExactOutputSingleParams({
+                tokenIn: tokenIn,
+                tokenOut: tokenOut,
+                fee: poolFee,
+                recipient: address(this),
+                deadline: block.timestamp,
+                amountOut: amountOut,
+                amountInMaximum: amountInMax,
+                sqrtPriceLimitX96: 0
+            });
+
+        amountIn = swapRouter.exactOutputSingle(params);
+    }
+
     function _wrapETH(address to, uint256 amount) internal {
         bytes[] memory inputs = new bytes[](1);
         inputs[0] = abi.encode(to, amount);

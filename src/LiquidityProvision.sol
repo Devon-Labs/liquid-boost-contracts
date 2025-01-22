@@ -7,6 +7,9 @@ import "lib/v3-core/contracts/libraries/TickMath.sol";
 import {RiskProfile} from "./LiquidBoost.sol";
 
 contract LiquidityProvision {
+    event LiquidityIncreased(uint256 tokenId, uint256 amount0, uint256 amount1, uint128 liquidity);
+    event LiquidityDecreased(uint256 tokenId, uint256 amount0, uint256 amount1, uint128 liquidity);
+
     INonfungiblePositionManager public immutable nonfungiblePositionManager;
 
     struct Position {
@@ -63,9 +66,18 @@ contract LiquidityProvision {
         });
 
         (tokenId, liquidity, amount0, amount1) = nonfungiblePositionManager.mint(params);
+        _createPosition(msg.sender, tokenId);
     }
 
-    function collectAllFees(uint256 tokenId) external returns (uint256 amount0, uint256 amount1) {
+    function compoundPosition(uint256 tokenId) external returns (uint256 amount0, uint256 amount1) {
+        (amount0, amount1) = _collect(tokenId);
+
+        if (amount0 > 0 && amount1 > 0) {
+            this.increaseLiquidity(tokenId, amount0, amount1);
+        } 
+    }
+
+    function _collect(uint256 tokenId) internal returns (uint256 amount0, uint256 amount1) {
         INonfungiblePositionManager.CollectParams memory params = INonfungiblePositionManager.CollectParams({
             tokenId: tokenId,
             recipient: address(this),
@@ -74,14 +86,14 @@ contract LiquidityProvision {
         });
 
         (amount0, amount1) = nonfungiblePositionManager.collect(params);
-
-        // TODO: Compund
     }
 
-    function removeLiquidity(uint256 tokenId) external returns (uint256 amount0, uint256 amount1) {
+    function removeLiquidity(uint256 tokenId) external returns (uint256 amount0, uint256 amount1, address token0, address token1) {
         require(msg.sender == positions[tokenId].owner, "Not the owner");
 
         uint128 liquidity = positions[tokenId].liquidity;
+        token0 = positions[tokenId].token0;
+        token1 = positions[tokenId].token1;
 
         INonfungiblePositionManager.DecreaseLiquidityParams memory params = 
             INonfungiblePositionManager.DecreaseLiquidityParams({
@@ -92,7 +104,13 @@ contract LiquidityProvision {
                 deadline: block.timestamp
             });
 
-            (amount0, amount1) = nonfungiblePositionManager.decreaseLiquidity(params);  
+        nonfungiblePositionManager.decreaseLiquidity(params);
+        (amount0, amount1) = _collect(tokenId);
+
+        positions[tokenId].owner = address(0);
+        positions[tokenId].liquidity = 0;
+
+        emit LiquidityDecreased(tokenId, amount0, amount1, liquidity);
     }
 
     function increaseLiquidity(uint256 tokenId, uint256 amount0Add, uint256 amount1Add) external returns (uint128 liquidity, uint256 amount0, uint256 amount1) {
@@ -107,5 +125,7 @@ contract LiquidityProvision {
             });
 
         (liquidity, amount0, amount1) = nonfungiblePositionManager.increaseLiquidity(params);
+
+        emit LiquidityIncreased(tokenId, amount0, amount1, liquidity);
     }
 }
